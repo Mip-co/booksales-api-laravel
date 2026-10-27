@@ -1,40 +1,59 @@
-# Booksales API - Tugas Pertemuan 2 (Migration & Seeder)
+# Booksales API - Tugas Pertemuan 3 (REST API Laravel)
 
-Proyek ini dibuat untuk memenuhi tugas implementasi sistem MVC (Model-View-Controller), Migration, Seeder, dan Relasi Eloquent sederhana pada framework Laravel dengan studi kasus data **Author** dan **Book**.
-
----
-
-## Struktur File & Perubahan
-
-Berikut adalah daftar file yang ditambahkan dan disesuaikan dalam tugas ini:
-
-### 1. Database & Seeder
-- `database\migrations\2026_10_27_032748_create_authors_table.php` — Skema tabel `authors` (id, name, photo, bio, timestamps).
-- `database\migrations\2026_10_27_032809_create_books_table.php` — Skema tabel `books` (id, title, description, price, stock, cover_photo, author_id, timestamps).
-- `database/seeders/AuthorSeeder.php` — Mengisi data awal dummy untuk tabel `authors`.
-- `database/seeders/BookSeeder.php` — Mengisi data awal dummy untuk tabel `books`.
-
-### 2. Model
-- `app/Models/Author.php` — Model untuk tabel `authors` beserta relasi `hasMany` ke `Book`.
-- `app/Models/Book.php` — Model untuk tabel `books` beserta relasi `belongsTo` ke `Author`.
-
-### 3. Controller
-- `app/Http/Controllers/AuthorController.php` — Mengambil data dari `Author` Model dan mengirimkannya ke View `authors.index`.
-- `app/Http/Controllers/BookController.php` — Mengambil data dari `Book` Model beserta relasi author-nya dan mengirimkannya ke View `books.index`.
-
-### 4. View
-- `resources/views/authors/index.blade.php` — Menampilkan tabel daftar author dengan styling CSS.
-- `resources/views/books/index.blade.php` — Menampilkan tabel daftar buku lengkap dengan harga, stok, dan nama penulis.
-
-### 5. Routing
-- `routes/web.php` — Mendaftarkan rute `/authors` dan `/books`.
+Proyek ini merupakan refactoring dari aplikasi web Laravel berbasis MVC (Blade views) menjadi layanan **REST API**. Aplikasi ini menyajikan data dalam format JSON untuk sumber daya **Author** dan **Book** yang siap dikonsumsi oleh aplikasi frontend atau mobile.
 
 ---
 
-## 📸 Tampilan Aplikasi
+## 🚀 Perubahan & Struktur API
 
-### 1. Daftar Author (`/authors`)
+Berikut adalah penyesuaian utama pada Pertemuan 2:
+
+1. ### Routing API
+   - `routes/api.php` — Semua rute dipindahkan ke file API dengan prefix `/api`.
+   - `routes/web.php` — Diperbarui/Dibersihkan dari rute berbasis view.
+
+2. ### Controller (JSON Output)
+   - `app/Http/Controllers/AuthorController.php` — Mengembalikan data seluruh *Author* dalam format JSON terstruktur.
+   - `app/Http/Controllers/BookController.php` — Mengembalikan data seluruh *Book* beserta relasi *Author*-nya (*Eager Loading*) dalam format JSON.
+
+3. ### Removal of Views
+   - Menghapus folder `resources/views/authors/` dan `resources/views/books/` karena aplikasi berfokus penuh sebagai backend API tanpa tampilan Blade.
+
+---
+
+## 📌 Endpoints API
+
+Semua request menggunakan HTTP Method `GET`:
+
+| Method | Endpoint | Deskripsi | Status Code |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/authors` | Mengambil seluruh data penulis (*authors*) | `200 OK` |
+| `GET` | `/api/books` | Mengambil seluruh data buku (*books*) beserta data penulisnya | `200 OK` |
+
+### Format Output JSON
+
+```json
+{
+  "success": true,
+  "message": "Get All Authors",
+  "data": [
+    {
+      "id": 1,
+      "name": "Tere Liye",
+      "photo": "tereliye.jpg",
+      "bio": "Penulis novel populer asal Indonesia.",
+      "created_at": "2026-10-27T11:40:27.000000Z",
+      "updated_at": "2026-10-27T11:40:27.000000Z"
+    }
+  ]
+}
+
+---
+
+## 📸 Pengujian dengan Postman
+
+### 1. Daftar Author (`/api/authors`)
 ![Daftar Author](author.png)
 
-### 2. Daftar Book (`/books`)
+### 2. Daftar Book (`/api/books`)
 ![Daftar Book](book.png)
