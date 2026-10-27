@@ -8,7 +8,9 @@ class AuthorController
 {
     public function index()
     {
-        $authors = Author::getAllData();
+        // Ubah dari Author::getAllData() menjadi Author::all()
+        $authors = Author::all(); 
+        
         return view('authors.index', compact('authors'));
     }
 }
