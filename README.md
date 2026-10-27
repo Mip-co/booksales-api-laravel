@@ -1,4 +1,4 @@
-# Booksales API - Tugas Pertemuan 1 (Sistem MVC Laravel)
+# Booksales API - Tugas Pertemuan 2 (Migration & Seeder)
 
 Proyek ini dibuat untuk memenuhi tugas implementasi sistem MVC (Model-View-Controller), Migration, Seeder, dan Relasi Eloquent sederhana pada framework Laravel dengan studi kasus data **Author** dan **Book**.
 
