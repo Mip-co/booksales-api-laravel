@@ -46,7 +46,8 @@ Semua request menggunakan HTTP Method `GET`:
       "updated_at": "2026-10-27T11:40:27.000000Z"
     }
   ]
-}
+}   
+```
 
 ---
 
