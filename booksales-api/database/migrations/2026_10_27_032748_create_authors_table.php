@@ -8,21 +8,17 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('books', function (Blueprint $table) {
+        Schema::create('authors', function (Blueprint $table) {
             $table->id();
-            $table->string('title');
-            $table->text('description')->nullable();
-            $table->decimal('price', 10, 2);
-            $table->integer('stock');
-            $table->string('cover_photo')->nullable();
-            $table->foreignId('genre_id')->nullable()->constrained('genres')->onDelete('set null');
-            $table->foreignId('author_id')->constrained('authors')->onDelete('cascade');
+            $table->string('name');
+            $table->string('photo')->nullable();
+            $table->text('bio')->nullable();
             $table->timestamps();
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('books');
+        Schema::dropIfExists('authors');
     }
 };
