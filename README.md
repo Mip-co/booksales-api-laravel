@@ -1,6 +1,6 @@
-# Booksales API - Tugas Read & Create Data (REST API Laravel)
+# Booksales API - Tugas Show, Update & Destroy Data (REST API Laravel)
 
-Proyek ini merupakan pengembangan lanjutan dari layanan **REST API** Laravel. Pada tahap ini ditambahkan fitur **Read** (membaca seluruh data) dan **Create** (menambah data baru) untuk sumber daya **Genre** dan **Author**, lengkap dengan validasi data dan status code HTTP yang sesuai.
+Proyek ini merupakan pengembangan lanjutan dari layanan **REST API** Laravel. Pada tahap ini ditambahkan fitur **Show** (membaca satu data), **Update** (memperbarui data), dan **Destroy** (menghapus data) untuk sumber daya **Genre** dan **Author**, lengkap dengan penanganan data yang tidak ditemukan (`404`) dan penyederhanaan rute menggunakan **`apiResource`**.
 
 ---
 
@@ -8,21 +8,27 @@ Proyek ini merupakan pengembangan lanjutan dari layanan **REST API** Laravel. Pa
 
 Berikut adalah penyesuaian utama pada tahap ini:
 
-1. ### Routing API
-   - `routes/api.php` — Menambahkan rute `GET` dan `POST` untuk `genres` dan `authors` dengan prefix `/api`.
+1. ### Routing API (Route API Resource)
+   - `routes/api.php` — Rute manual `GET` dan `POST` untuk genre dan author diganti dengan `Route::apiResource()`, sehingga satu baris otomatis membuat lima rute (`index`, `store`, `show`, `update`, `destroy`).
+
+   Sebelum:
+   ```php
+   Route::get('/genres', [GenreController::class, 'index']);
+   Route::post('/genres', [GenreController::class, 'store']);
+   ```
+
+   Sesudah:
+   ```php
+   Route::apiResource('/genres', GenreController::class);
+   Route::apiResource('/authors', AuthorController::class);
+   ```
 
 2. ### Controller (JSON Output)
-   - `app/Http/Controllers/GenreController.php` — Method `index()` mengembalikan seluruh data *Genre*, method `store()` memvalidasi lalu menyimpan *Genre* baru.
-   - `app/Http/Controllers/AuthorController.php` — Method `index()` mengembalikan seluruh data *Author*, method `store()` memvalidasi lalu menyimpan *Author* baru.
+   - `app/Http/Controllers/GenreController.php` — Menambahkan method `show()`, `update()`, dan `destroy()`.
+   - `app/Http/Controllers/AuthorController.php` — Menambahkan method `show()`, `update()`, dan `destroy()`.
 
-3. ### Model (Eloquent ORM)
-   - `app/Models/Genre.php` — Diubah menjadi model Eloquent dengan `$fillable` (`name`, `description`) dan relasi `hasMany` ke *Book*.
-   - `app/Models/Author.php` — `$fillable` disesuaikan dengan kolom tabel (`name`, `photo`, `bio`).
-
-4. ### Database (Migration & Seeder)
-   - `create_authors_table` — Migrasi tabel `authors` diperbaiki.
-   - `create_genres_table` — Migrasi tabel `genres` ditambahkan (dijalankan sebelum tabel `books` karena `books.genre_id` merupakan foreign key).
-   - `GenreSeeder` — Seeder data awal genre, dipanggil lebih dulu di `DatabaseSeeder` sebelum `AuthorSeeder` dan `BookSeeder`.
+3. ### Penanganan Data Tidak Ditemukan
+   - Setiap method yang menerima `{id}` (`show`, `update`, `destroy`) mencari data dengan `find()`. Jika data tidak ada, API mengembalikan respons JSON dengan status code `404 Not Found`.
 
 ---
 
@@ -31,12 +37,18 @@ Berikut adalah penyesuaian utama pada tahap ini:
 | Method | Endpoint | Deskripsi | Status Code |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/genres` | Mengambil seluruh data genre | `200 OK` |
-| `POST` | `/api/genres` | Menambahkan data genre baru | `201 Created` / `422 Unprocessable Content` |
-| `GET` | `/api/authors` | Mengambil seluruh data penulis (*authors*) | `200 OK` |
-| `POST` | `/api/authors` | Menambahkan data penulis baru | `201 Created` / `422 Unprocessable Content` |
+| `POST` | `/api/genres` | Menambahkan data genre baru | `201 Created` / `422` |
+| `GET` | `/api/genres/{id}` | Mengambil satu data genre | `200 OK` / `404` |
+| `PUT` / `PATCH` | `/api/genres/{id}` | Memperbarui data genre | `200 OK` / `404` / `422` |
+| `DELETE` | `/api/genres/{id}` | Menghapus data genre | `200 OK` / `404` |
+| `GET` | `/api/authors` | Mengambil seluruh data penulis | `200 OK` |
+| `POST` | `/api/authors` | Menambahkan data penulis baru | `201 Created` / `422` |
+| `GET` | `/api/authors/{id}` | Mengambil satu data penulis | `200 OK` / `404` |
+| `PUT` / `PATCH` | `/api/authors/{id}` | Memperbarui data penulis | `200 OK` / `404` / `422` |
+| `DELETE` | `/api/authors/{id}` | Menghapus data penulis | `200 OK` / `404` |
 | `GET` | `/api/books` | Mengambil seluruh data buku beserta data penulisnya | `200 OK` |
 
-### Aturan Validasi (POST)
+### Aturan Validasi (POST & PUT)
 
 | Endpoint | Field | Aturan |
 | :--- | :--- | :--- |
@@ -50,33 +62,31 @@ Berikut adalah penyesuaian utama pada tahap ini:
 
 ### Format Output JSON
 
-**Read data (`200 OK`)**
+**Show data (`200 OK`)** — `GET /api/genres/1`
 
 ```json
 {
   "status": "success",
-  "message": "Berhasil mengambil seluruh data genre",
-  "data": [
-    {
-      "id": 1,
-      "name": "Fiction",
-      "description": "A literary work based on the imagination and not necessarily on fact.",
-      "created_at": "2026-10-27T11:43:50.000000Z",
-      "updated_at": "2026-10-27T11:43:50.000000Z"
-    }
-  ]
+  "message": "Berhasil mengambil detail data genre",
+  "data": {
+    "id": 1,
+    "name": "Fiction",
+    "description": "A literary work based on the imagination and not necessarily on fact.",
+    "created_at": "2026-10-27T11:43:50.000000Z",
+    "updated_at": "2026-10-27T11:43:50.000000Z"
+  }
 }
 ```
 
-**Create data (`201 Created`)**
+**Update data (`200 OK`)** — `PUT /api/authors/6`
 
-Request body `POST /api/authors`:
+Request body:
 
 ```json
 {
   "name": "Raditya Dika",
-  "photo": "radit.jpg",
-  "bio": "Penulis dan komedian."
+  "photo": "radit-baru.jpg",
+  "bio": "Penulis, komedian, dan sutradara."
 }
 ```
 
@@ -85,19 +95,59 @@ Respons:
 ```json
 {
   "status": "success",
-  "message": "Berhasil menambahkan data author",
+  "message": "Berhasil mengubah data author",
   "data": {
+    "id": 6,
     "name": "Raditya Dika",
-    "photo": "radit.jpg",
-    "bio": "Penulis dan komedian.",
-    "updated_at": "2026-10-29T04:15:12.000000Z",
+    "photo": "radit-baru.jpg",
+    "bio": "Penulis, komedian, dan sutradara.",
     "created_at": "2026-10-29T04:15:12.000000Z",
-    "id": 6
+    "updated_at": "2026-10-30T03:27:23.000000Z"
+  }
+}
+```
+
+**Destroy data (`200 OK`)** — `DELETE /api/genres/6`
+
+```json
+{
+  "status": "success",
+  "message": "Berhasil menghapus data genre"
+}
+```
+
+**Data tidak ditemukan (`404 Not Found`)** — misalnya `GET /api/authors/99`
+
+```json
+{
+  "status": "error",
+  "message": "Data author tidak ditemukan"
+}
+```
+
+**Validasi gagal (`422`)** — misalnya `PUT` tanpa field `name`
+
+```json
+{
+  "message": "The name field is required.",
+  "errors": {
+    "name": ["The name field is required."]
   }
 }
 ```
 
 ---
+
+## ⚙️ Cara Menjalankan
+
+```bash
+composer install
+cp .env.example .env
+php artisan key:generate
+# sesuaikan DB_DATABASE (db_penjualan_buku), DB_USERNAME, dan DB_PASSWORD di file .env
+php artisan migrate:fresh --seed
+php artisan serve
+```
 
 API dapat diakses di `http://127.0.0.1:8000/api`.
 
@@ -105,14 +155,48 @@ API dapat diakses di `http://127.0.0.1:8000/api`.
 
 ## 📸 Pengujian dengan Postman
 
-### 1. Read Genre (`GET /api/genres`)
-![Get All Genres](get-genres.png)
+### Genre
 
-### 2. Create Genre (`POST /api/genres`)
-![Create Genre](post-genres.png)
+#### 1. Show Genre (`GET /api/genres/1`) — `200 OK`
+![Show Genre](hasil/show-genre.png)
 
-### 3. Read Author (`GET /api/authors`)
-![Get All Authors](get-authors.png)
+#### 2. Show Genre tidak ditemukan (`GET /api/genres/99`) — `404 Not Found`
+![Show Genre 404](hasil/show-genre-404.png)
 
-### 4. Create Author (`POST /api/authors`)
-![Create Author](post-authors.png)
+#### 3. Update Genre (`PUT /api/genres/6`) — `200 OK`
+![Update Genre](hasil/update-genre.png)
+
+#### 4. Update Genre tanpa `name` (`PUT /api/genres/6`) — `422`
+![Update Genre 422](hasil/update-genre-422.png)
+
+#### 5. Update Genre tidak ditemukan (`PUT /api/genres/99`) — `404 Not Found`
+![Update Genre 404](hasil/update-genre-404.png)
+
+#### 6. Destroy Genre (`DELETE /api/genres/6`) — `200 OK`
+![Delete Genre](hasil/delete-genre.png)
+
+#### 7. Destroy Genre yang sudah dihapus (`DELETE /api/genres/6`) — `404 Not Found`
+![Delete Genre 404](hasil/delete-genre-404.png)
+
+### Author
+
+#### 1. Show Author (`GET /api/authors/1`) — `200 OK`
+![Show Author](hasil/show-author.png)
+
+#### 2. Show Author tidak ditemukan (`GET /api/authors/99`) — `404 Not Found`
+![Show Author 404](hasil/show-author-404.png)
+
+#### 3. Update Author (`PUT /api/authors/6`) — `200 OK`
+![Update Author](hasil/update-author.png)
+
+#### 4. Update Author tanpa `name` (`PUT /api/authors/6`) — `422`
+![Update Author 422](hasil/update-author-422.png)
+
+#### 5. Update Author tidak ditemukan (`PUT /api/authors/99`) — `404 Not Found`
+![Update Author 404](hasil/update-author-404.png)
+
+#### 6. Destroy Author (`DELETE /api/authors/6`) — `200 OK`
+![Delete Author](hasil/delete-author.png)
+
+#### 7. Destroy Author yang sudah dihapus (`DELETE /api/authors/6`) — `404 Not Found`
+![Delete Author 404](hasil/delete-author-404.png)
