@@ -1,6 +1,6 @@
-# Booksales API - Tugas Show, Update & Destroy Data (REST API Laravel)
+# Booksales API - Tugas Authentication & Authorization (REST API Laravel)
 
-Proyek ini merupakan pengembangan lanjutan dari layanan **REST API** Laravel. Pada tahap ini ditambahkan fitur **Show** (membaca satu data), **Update** (memperbarui data), dan **Destroy** (menghapus data) untuk sumber daya **Genre** dan **Author**, lengkap dengan penanganan data yang tidak ditemukan (`404`) dan penyederhanaan rute menggunakan **`apiResource`**.
+Proyek ini merupakan pengembangan lanjutan dari layanan **REST API** Laravel. Pada tahap ini ditambahkan **autentikasi** menggunakan **JWT (JSON Web Token)**, **middleware**, dan **RBAC (Role-Based Access Control)**, sehingga hak akses setiap endpoint untuk sumber daya **Genre** dan **Author** dapat diatur berdasarkan status login dan role pengguna.
 
 ---
 
@@ -8,85 +8,93 @@ Proyek ini merupakan pengembangan lanjutan dari layanan **REST API** Laravel. Pa
 
 Berikut adalah penyesuaian utama pada tahap ini:
 
-1. ### Routing API (Route API Resource)
-   - `routes/api.php` — Rute manual `GET` dan `POST` untuk genre dan author diganti dengan `Route::apiResource()`, sehingga satu baris otomatis membuat lima rute (`index`, `store`, `show`, `update`, `destroy`).
+1. ### Autentikasi JWT
+   - Menggunakan paket `tymon/jwt-auth`.
+   - `config/auth.php` — Menambahkan guard `api` dengan driver `jwt`.
+   - `app/Models/User.php` — Mengimplementasikan `JWTSubject` dan menyimpan `role` di dalam payload token.
+   - `app/Http/Controllers/AuthController.php` — Method `register`, `login`, `me`, dan `logout`.
 
-   Sebelum:
+2. ### Middleware & RBAC
+   - `app/Http/Middleware/RoleMiddleware.php` — Memeriksa role pengguna. Belum login mengembalikan `401`, role tidak sesuai mengembalikan `403`.
+   - `bootstrap/app.php` — Mendaftarkan alias middleware `role`, mengatur agar user yang belum login tidak di-redirect, dan memastikan semua error di `/api/*` selalu berformat JSON.
+
+3. ### Routing API
+   - `routes/api.php` — Rute dibagi menjadi tiga kelompok: publik, wajib login, dan khusus admin.
+
    ```php
-   Route::get('/genres', [GenreController::class, 'index']);
-   Route::post('/genres', [GenreController::class, 'store']);
+   // Publik: Read All & Show (tanpa login)
+   Route::apiResource('/genres', GenreController::class)->only(['index', 'show']);
+   Route::apiResource('/authors', AuthorController::class)->only(['index', 'show']);
+
+   // Wajib login (token JWT)
+   Route::middleware('auth:api')->group(function () {
+       Route::get('/me', [AuthController::class, 'me']);
+       Route::post('/logout', [AuthController::class, 'logout']);
+
+       // Hanya admin: Create, Update, Destroy
+       Route::middleware('role:admin')->group(function () {
+           Route::apiResource('/genres', GenreController::class)->only(['store', 'update', 'destroy']);
+           Route::apiResource('/authors', AuthorController::class)->only(['store', 'update', 'destroy']);
+       });
+   });
    ```
 
-   Sesudah:
-   ```php
-   Route::apiResource('/genres', GenreController::class);
-   Route::apiResource('/authors', AuthorController::class);
-   ```
+4. ### Database (Migration & Seeder)
+   - `create_users_table` — Tabel `users` dengan kolom `role` (`admin` / `customer`) dan `last_access`.
+   - `UserSeeder` — Membuat satu akun admin dan satu akun customer.
 
-2. ### Controller (JSON Output)
-   - `app/Http/Controllers/GenreController.php` — Menambahkan method `show()`, `update()`, dan `destroy()`.
-   - `app/Http/Controllers/AuthorController.php` — Menambahkan method `show()`, `update()`, dan `destroy()`.
+---
 
-3. ### Penanganan Data Tidak Ditemukan
-   - Setiap method yang menerima `{id}` (`show`, `update`, `destroy`) mencari data dengan `find()`. Jika data tidak ada, API mengembalikan respons JSON dengan status code `404 Not Found`.
+## 🔐 Akun Pengujian (Seeder)
+
+| Role | Email | Password |
+| :--- | :--- | :--- |
+| `admin` | `admin@booksales.com` | `admin12345` |
+| `customer` | `customer@booksales.com` | `customer12345` |
+
+> Akun yang mendaftar lewat `/api/register` selalu mendapat role `customer`. Role tidak dapat ditentukan dari request.
 
 ---
 
 ## 📌 Endpoints API
 
-| Method | Endpoint | Deskripsi | Status Code |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/genres` | Mengambil seluruh data genre | `200 OK` |
-| `POST` | `/api/genres` | Menambahkan data genre baru | `201 Created` / `422` |
-| `GET` | `/api/genres/{id}` | Mengambil satu data genre | `200 OK` / `404` |
-| `PUT` / `PATCH` | `/api/genres/{id}` | Memperbarui data genre | `200 OK` / `404` / `422` |
-| `DELETE` | `/api/genres/{id}` | Menghapus data genre | `200 OK` / `404` |
-| `GET` | `/api/authors` | Mengambil seluruh data penulis | `200 OK` |
-| `POST` | `/api/authors` | Menambahkan data penulis baru | `201 Created` / `422` |
-| `GET` | `/api/authors/{id}` | Mengambil satu data penulis | `200 OK` / `404` |
-| `PUT` / `PATCH` | `/api/authors/{id}` | Memperbarui data penulis | `200 OK` / `404` / `422` |
-| `DELETE` | `/api/authors/{id}` | Menghapus data penulis | `200 OK` / `404` |
-| `GET` | `/api/books` | Mengambil seluruh data buku beserta data penulisnya | `200 OK` |
+| Method | Endpoint | Deskripsi | Hak Akses | Status Code |
+| :--- | :--- | :--- | :--- | :--- |
+| `POST` | `/api/register` | Registrasi akun baru (role `customer`) | Publik | `201` / `422` |
+| `POST` | `/api/login` | Login dan mendapatkan token JWT | Publik | `200` / `401` / `422` |
+| `GET` | `/api/genres` | Mengambil seluruh data genre | Publik | `200` |
+| `GET` | `/api/genres/{id}` | Mengambil satu data genre | Publik | `200` / `404` |
+| `GET` | `/api/authors` | Mengambil seluruh data penulis | Publik | `200` |
+| `GET` | `/api/authors/{id}` | Mengambil satu data penulis | Publik | `200` / `404` |
+| `GET` | `/api/me` | Data user yang sedang login | Login | `200` / `401` |
+| `POST` | `/api/logout` | Logout (token tidak berlaku lagi) | Login | `200` / `401` |
+| `POST` | `/api/genres` | Menambahkan data genre | Admin | `201` / `401` / `403` / `422` |
+| `PUT` | `/api/genres/{id}` | Memperbarui data genre | Admin | `200` / `401` / `403` / `404` / `422` |
+| `DELETE` | `/api/genres/{id}` | Menghapus data genre | Admin | `200` / `401` / `403` / `404` |
+| `POST` | `/api/authors` | Menambahkan data penulis | Admin | `201` / `401` / `403` / `422` |
+| `PUT` | `/api/authors/{id}` | Memperbarui data penulis | Admin | `200` / `401` / `403` / `404` / `422` |
+| `DELETE` | `/api/authors/{id}` | Menghapus data penulis | Admin | `200` / `401` / `403` / `404` |
 
-### Aturan Validasi (POST & PUT)
+### Cara Memakai Token
 
-| Endpoint | Field | Aturan |
-| :--- | :--- | :--- |
-| `/api/genres` | `name` | `required`, string, maksimal 255 karakter |
-| `/api/genres` | `description` | `nullable`, string |
-| `/api/authors` | `name` | `required`, string, maksimal 255 karakter |
-| `/api/authors` | `photo` | `nullable`, string, maksimal 255 karakter |
-| `/api/authors` | `bio` | `nullable`, string |
+Setelah login, salin nilai `access_token` lalu kirimkan pada setiap request yang membutuhkan login melalui header:
 
-> **Catatan:** Tambahkan header `Accept: application/json` pada setiap request agar respons validasi yang gagal berupa JSON (`422`), bukan redirect.
+```
+Authorization: Bearer <access_token>
+```
+
+Di Postman: tab **Authorization** → **Bearer Token** → tempel token.
 
 ### Format Output JSON
 
-**Show data (`200 OK`)** — `GET /api/genres/1`
-
-```json
-{
-  "status": "success",
-  "message": "Berhasil mengambil detail data genre",
-  "data": {
-    "id": 1,
-    "name": "Fiction",
-    "description": "A literary work based on the imagination and not necessarily on fact.",
-    "created_at": "2026-10-27T11:43:50.000000Z",
-    "updated_at": "2026-10-27T11:43:50.000000Z"
-  }
-}
-```
-
-**Update data (`200 OK`)** — `PUT /api/authors/6`
+**Login (`200 OK`)** — `POST /api/login`
 
 Request body:
 
 ```json
 {
-  "name": "Raditya Dika",
-  "photo": "radit-baru.jpg",
-  "bio": "Penulis, komedian, dan sutradara."
+  "email": "customer@booksales.com",
+  "password": "customer12345"
 }
 ```
 
@@ -95,59 +103,52 @@ Respons:
 ```json
 {
   "status": "success",
-  "message": "Berhasil mengubah data author",
+  "message": "Berhasil login",
   "data": {
-    "id": 6,
-    "name": "Raditya Dika",
-    "photo": "radit-baru.jpg",
-    "bio": "Penulis, komedian, dan sutradara.",
-    "created_at": "2026-10-29T04:15:12.000000Z",
-    "updated_at": "2026-10-30T03:27:23.000000Z"
+    "user": {
+      "id": 2,
+      "name": "Customer Booksales",
+      "email": "customer@booksales.com",
+      "role": "customer",
+      "last_access": "2026-10-31T10:52:24.000000Z",
+      "created_at": "2026-10-31T10:40:20.000000Z",
+      "updated_at": "2026-10-31T10:52:24.000000Z"
+    },
+    "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+    "token_type": "bearer",
+    "expires_in": 3600
   }
 }
 ```
 
-**Destroy data (`200 OK`)** — `DELETE /api/genres/6`
+**Belum login (`401 Unauthorized`)** — misalnya `POST /api/genres` tanpa token
 
 ```json
 {
-  "status": "success",
-  "message": "Berhasil menghapus data genre"
+  "message": "Unauthenticated."
 }
 ```
 
-**Data tidak ditemukan (`404 Not Found`)** — misalnya `GET /api/authors/99`
+**Bukan admin (`403 Forbidden`)** — misalnya `POST /api/genres` dengan token customer
 
 ```json
 {
   "status": "error",
-  "message": "Data author tidak ditemukan"
+  "message": "Akses ditolak. Endpoint ini hanya untuk role: admin"
 }
 ```
 
-**Validasi gagal (`422`)** — misalnya `PUT` tanpa field `name`
+**Data tidak ditemukan (`404 Not Found`)** — misalnya `DELETE /api/genres/7` yang sudah dihapus
 
 ```json
 {
-  "message": "The name field is required.",
-  "errors": {
-    "name": ["The name field is required."]
-  }
+  "status": "error",
+  "message": "Data genre tidak ditemukan"
 }
 ```
 
 ---
 
-## ⚙️ Cara Menjalankan
-
-```bash
-composer install
-cp .env.example .env
-php artisan key:generate
-# sesuaikan DB_DATABASE (db_penjualan_buku), DB_USERNAME, dan DB_PASSWORD di file .env
-php artisan migrate:fresh --seed
-php artisan serve
-```
 
 API dapat diakses di `http://127.0.0.1:8000/api`.
 
@@ -155,48 +156,68 @@ API dapat diakses di `http://127.0.0.1:8000/api`.
 
 ## 📸 Pengujian dengan Postman
 
-### Genre
+### 1. Tanpa Login
 
-#### 1. Show Genre (`GET /api/genres/1`) — `200 OK`
-![Show Genre](hasil/show-genre.png)
+#### Melihat daftar genre (`GET /api/genres`) — `200 OK`
+![Get Genres](hasil/tanpa-login-get-genres.png)
 
-#### 2. Show Genre tidak ditemukan (`GET /api/genres/99`) — `404 Not Found`
-![Show Genre 404](hasil/show-genre-404.png)
+#### Melihat detail genre (`GET /api/genres/1`) — `200 OK`
+![Get Genre Detail](hasil/tanpa-login-get-genre-detail.png)
 
-#### 3. Update Genre (`PUT /api/genres/6`) — `200 OK`
-![Update Genre](hasil/update-genre.png)
+#### Melihat daftar author (`GET /api/authors`) — `200 OK`
+![Get Authors](hasil/tanpa-login-get-authors.png)
 
-#### 4. Update Genre tanpa `name` (`PUT /api/genres/6`) — `422`
-![Update Genre 422](hasil/update-genre-422.png)
+#### Melihat detail author (`GET /api/authors/1`) — `200 OK`
+![Get Author Detail](hasil/tanpa-login-get-author-detail.png)
 
-#### 5. Update Genre tidak ditemukan (`PUT /api/genres/99`) — `404 Not Found`
-![Update Genre 404](hasil/update-genre-404.png)
+#### Menambah genre tanpa login (`POST /api/genres`) — `401 Unauthorized`
+![Create Genre 401](hasil/tanpa-login-post-genre-401.png)
 
-#### 6. Destroy Genre (`DELETE /api/genres/6`) — `200 OK`
-![Delete Genre](hasil/delete-genre.png)
+#### Mengubah author tanpa login (`PUT /api/authors/1`) — `401 Unauthorized`
+![Update Author 401](hasil/tanpa-login-put-author-401.png)
 
-#### 7. Destroy Genre yang sudah dihapus (`DELETE /api/genres/6`) — `404 Not Found`
-![Delete Genre 404](hasil/delete-genre-404.png)
+#### Menghapus genre tanpa login (`DELETE /api/genres/1`) — `401 Unauthorized`
+![Delete Genre 401](hasil/tanpa-login-delete-genre-401.png)
 
-### Author
+### 2. Login sebagai Customer
 
-#### 1. Show Author (`GET /api/authors/1`) — `200 OK`
-![Show Author](hasil/show-author.png)
+#### Login customer (`POST /api/login`) — `200 OK`
+![Login Customer](hasil/customer-login.png)
 
-#### 2. Show Author tidak ditemukan (`GET /api/authors/99`) — `404 Not Found`
-![Show Author 404](hasil/show-author-404.png)
+#### Menambah genre (`POST /api/genres`) — `403 Forbidden`
+![Customer Create Genre 403](hasil/customer-post-genre-403.png)
 
-#### 3. Update Author (`PUT /api/authors/6`) — `200 OK`
-![Update Author](hasil/update-author.png)
+#### Mengubah author (`PUT /api/authors/1`) — `403 Forbidden`
+![Customer Update Author 403](hasil/customer-put-author-403.png)
 
-#### 4. Update Author tanpa `name` (`PUT /api/authors/6`) — `422`
-![Update Author 422](hasil/update-author-422.png)
+#### Menghapus genre (`DELETE /api/genres/1`) — `403 Forbidden`
+![Customer Delete Genre 403](hasil/customer-delete-genre-403.png)
 
-#### 5. Update Author tidak ditemukan (`PUT /api/authors/99`) — `404 Not Found`
-![Update Author 404](hasil/update-author-404.png)
+#### Melihat detail genre (`GET /api/genres/1`) — `200 OK` (tetap bisa karena publik)
+![Customer Get Genre](hasil/customer-get-genre-200.png)
 
-#### 6. Destroy Author (`DELETE /api/authors/6`) — `200 OK`
-![Delete Author](hasil/delete-author.png)
+### 3. Login sebagai Admin
 
-#### 7. Destroy Author yang sudah dihapus (`DELETE /api/authors/6`) — `404 Not Found`
-![Delete Author 404](hasil/delete-author-404.png)
+#### Login admin (`POST /api/login`) — `200 OK`
+![Login Admin](hasil/admin-login.png)
+
+#### Menambah genre (`POST /api/genres`) — `201 Created`
+![Admin Create Genre](hasil/admin-post-genre-201.png)
+
+#### Mengubah genre (`PUT /api/genres/7`) — `200 OK`
+![Admin Update Genre](hasil/admin-put-genre-200.png)
+
+#### Menghapus genre (`DELETE /api/genres/7`) — `200 OK`
+![Admin Delete Genre](hasil/admin-delete-genre-200.png)
+
+#### Menghapus genre yang sudah dihapus (`DELETE /api/genres/7`) — `404 Not Found`
+![Admin Delete Genre 404](hasil/admin-delete-genre-404.png)
+
+#### Menambah author (`POST /api/authors`) — `201 Created`
+![Admin Create Author](hasil/admin-post-author-201.png)
+
+#### Mengubah author (`PUT /api/authors/7`) — `200 OK`
+![Admin Update Author](hasil/admin-put-author-200.png)
+
+#### Menghapus author (`DELETE /api/authors/7`) — `200 OK`
+![Admin Delete Author](hasil/admin-delete-author-200.png)
