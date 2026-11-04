@@ -196,7 +196,7 @@ API dapat diakses di `http://127.0.0.1:8000/api`.
 ### 1. Tanpa Login
 
 #### Membuat transaksi tanpa token (`POST /api/transactions`) — `401 Unauthorized`
-![Create Transaction 401](hasil/![alt text](image.png).png)
+![Create Transaction 401](hasil/![alt text](tanpa-login-post-transaction-401.png).png)
 
 ### 2. Login sebagai Customer
 
